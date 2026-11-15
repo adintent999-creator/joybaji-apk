@@ -1,0 +1,33 @@
+name: Build JoyBaji APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk joybaji.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: joybaji-apk, path: joybaji.apk }
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: JoyBaji APK build ${{ github.run_number }}
+          files: joybaji.apk
+          body: |
+            JoyBaji Android app (WebView shell) — install on Android 8.0+.
+            Download: joybaji.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- "J" mark, drawn inside the 66dp adaptive-icon safe zone -->
+  <path
+      android:fillColor="#160F02"
+      android:pathData="M62,32 L74,32 L74,64 A18,18 0 0 1 38,64 L50,64 A6,6 0 0 0 62,64 Z" />
+  <path
+      android:fillColor="#160F02"
+      android:pathData="M34,40 L46,40 L46,46 L34,46 Z" />
+</vector>
