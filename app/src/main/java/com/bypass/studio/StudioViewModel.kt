@@ -682,7 +682,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             val output = withContext(Dispatchers.IO) { runCommand("id -u", capture = true) }
             rootAvailable = output.trim() == "0"
             rootStatus.value = if (rootAvailable) "ROOT" else "STANDARD"
-            terminal.add(if (rootAvailable) "[ROOT] Root access available" else "[STANDARD] Root unavailable, using shell/Shizuku mode")
+            terminal.add(if (rootAvailable) "[ROOT] Root access available" else "[STANDARD] Root unavailable, app shell only")
         }
     }
 

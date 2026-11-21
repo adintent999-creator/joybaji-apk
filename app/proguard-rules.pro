@@ -18,7 +18,6 @@
 -dontwarn kotlinx.serialization.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn org.nanohttpd.**
--dontwarn moe.shizuku.**
 
 # Android components referenced from manifest or created reflectively.
 -keep public class * extends android.app.Activity { *; }
@@ -39,7 +38,6 @@
 -keep class com.bypass.studio.PendingAction { *; }
 -keep class com.bypass.studio.ChatMessage { *; }
 -keep class com.bypass.studio.ServerInfo { *; }
--keep class com.bypass.studio.Chat { *; }
 -keep class com.bypass.studio.Memory { *; }
 -keep class com.bypass.studio.AiConfig { *; }
 -keep class com.bypass.studio.BroadcastLine { *; }
@@ -93,9 +91,7 @@
 -keep class org.nanohttpd.** { *; }
 -keep interface org.nanohttpd.** { *; }
 
-# Shizuku/AIDL and binder boundaries when present.
--keep class moe.shizuku.api.** { *; }
--keep interface moe.shizuku.api.** { *; }
+# Binder boundaries.
 -keep class * implements android.os.IInterface { *; }
 -keep class com.bypass.studio.**$Stub { *; }
 -keep class com.bypass.studio.**$Stub$Proxy { *; }
