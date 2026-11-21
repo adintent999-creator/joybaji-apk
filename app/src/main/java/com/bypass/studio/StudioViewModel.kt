@@ -474,7 +474,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         if (text.isBlank() || streaming.value) return
         input.value = ""
         messages.add(ChatMessage("user", text))
-        viewModelScope.launch { dao.insertChat(Chat(session = session.value, role = "user", content = text)) }
+        viewModelScope.launch { dao.insertChat(Chat(sessionId = session.value, role = "user", content = text)) }
         streamJob?.cancel()
         streaming.value = true
         streamBuffer.value = ""
@@ -537,7 +537,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun appendAssistant(text: String) {
         messages.add(ChatMessage("assistant", text))
-        dao.insertChat(Chat(session = session.value, role = "assistant", content = text))
+        dao.insertChat(Chat(sessionId = session.value, role = "assistant", content = text))
     }
 
     private fun parseActions(text: String): List<PendingAction> {
@@ -716,7 +716,11 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun speak(text: String) = voice.speak(text, language.value, persona.value, speed.value)
+    fun speak(text: String) = speak(text, language.value, persona.value, speed.value)
+
+    fun speak(text: String, lang: String, voicePersona: String, voiceSpeed: Float) {
+        voice.speak(text, lang, voicePersona, voiceSpeed)
+    }
 
     fun startVoiceInput(recognizer: SpeechRecognizer) {
         voice.startListening(
@@ -812,7 +816,9 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
                 onProgress = { p ->
                     viewModelScope.launch(Dispatchers.Main) { broadcastProgress.value = p }
                 },
-                onLog = { line -> withContext(Dispatchers.Main) { log(line) } }
+                onLog = { line ->
+                    viewModelScope.launch(Dispatchers.Main) { log(line) }
+                }
             )
         }
     }
