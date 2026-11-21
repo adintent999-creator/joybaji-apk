@@ -171,8 +171,8 @@ object BroadcastExporter {
             if (audioTrack < 0) return ShortArray(0)
             val format = extractor.getTrackFormat(audioTrack)
             extractor.selectTrack(audioTrack)
-            var srcRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInt(MediaFormat.KEY_SAMPLE_RATE) else SAMPLE_RATE
-            var channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInt(MediaFormat.KEY_CHANNEL_COUNT) else 1
+            var srcRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else SAMPLE_RATE
+            var channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 1
             codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
             codec.configure(format, null, null, 0)
             codec.start()
@@ -199,8 +199,8 @@ object BroadcastExporter {
                     when (val outId = codec.dequeueOutputBuffer(info, 0)) {
                         MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                             val f = codec.outputFormat
-                            srcRate = if (f.containsKey(MediaFormat.KEY_SAMPLE_RATE)) f.getInt(MediaFormat.KEY_SAMPLE_RATE) else srcRate
-                            channels = if (f.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) f.getInt(MediaFormat.KEY_CHANNEL_COUNT) else channels
+                            srcRate = if (f.containsKey(MediaFormat.KEY_SAMPLE_RATE)) f.getInteger(MediaFormat.KEY_SAMPLE_RATE) else srcRate
+                            channels = if (f.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) f.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else channels
                         }
                         in 0..Int.MAX_VALUE -> {
                             if (outId >= 0) {
