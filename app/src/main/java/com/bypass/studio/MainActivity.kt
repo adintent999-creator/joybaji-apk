@@ -1,7 +1,6 @@
 package com.bypass.studio
 
 import android.Manifest
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.speech.SpeechRecognizer
@@ -27,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
@@ -48,15 +46,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             StudioTheme(vm.theme.value) {
-                LaunchedEffect(vm.capsule.value) {
-                    if (vm.capsule.value) this@MainActivity.startService(Intent(this@MainActivity, OverlayService::class.java))
-                    else this@MainActivity.stopService(Intent(this@MainActivity, OverlayService::class.java))
-                }
-                LaunchedEffect(vm.backgroundAssistant.value) {
-                    val intent = Intent(this@MainActivity, VoiceService::class.java)
-                    if (vm.backgroundAssistant.value) ContextCompat.startForegroundService(this@MainActivity, intent)
-                    else this@MainActivity.stopService(intent)
-                }
+                LaunchedEffect(Unit) { vm.checkRootOnce() }
+                LaunchedEffect(vm.capsule.value) { vm.syncOverlay(this@MainActivity) }
+                LaunchedEffect(vm.backgroundAssistant.value) { vm.syncBackground(this@MainActivity) }
                 Scaffold(
                     topBar = { TopHeader(vm) },
                     bottomBar = { BottomNav(vm) },
@@ -70,6 +62,9 @@ class MainActivity : ComponentActivity() {
                             3 -> TerminalScreen(vm)
                             4 -> PreviewScreen(vm)
                             5 -> SettingsScreen(vm)
+                            6 -> MemoryScreen(vm)
+                            7 -> BroadcastStudioScreen(vm)
+                            8 -> ServersScreen(vm)
                             else -> HomeScreen(vm, recognizer)
                         }
                         ApprovalOverlay(vm)
@@ -79,10 +74,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        vm.syncOverlay(this)
+        vm.syncBackground(this)
+    }
+
     override fun onDestroy() {
         runCatching { recognizer.destroy() }
-        vm.voice.shutdown()
-        vm.stopServer()
+        if (!isChangingConfigurations) vm.voice.shutdown()
+        vm.stopAllManagedServers()
         super.onDestroy()
     }
 }

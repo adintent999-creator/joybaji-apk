@@ -6,6 +6,8 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -81,15 +83,16 @@ object AiClient {
                 messages.forEach { (role, text) ->
                     arr.put(JSONObject().put("role", role).put("content", text))
                 }
-                val extra = if (cfg.provider == Provider.OPENROUTER) {
-                    JSONObject().put("reasoning", JSONObject().put("effort", budgetLabel(cfg.budget)))
-                } else JSONObject()
                 JSONObject()
                     .put("model", cfg.model)
                     .put("stream", true)
                     .put("messages", arr)
                     .put("max_tokens", cfg.budget)
-                    .let { if (cfg.provider == Provider.OPENROUTER) it.put("reasoning", extra.getJSONObject("reasoning")) else it }
+                    .let {
+                        if (cfg.provider == Provider.OPENROUTER) {
+                            it.put("reasoning", JSONObject().put("effort", budgetLabel(cfg.budget)))
+                        } else it
+                    }
                     .toString()
             }
         }
@@ -119,47 +122,220 @@ object AiClient {
         else -> "none"
     }
 
-    private fun extractChunk(provider: Provider, data: String): String {
-        return try {
-            val root = JSONObject(data)
-            when (provider) {
-                Provider.GEMINI -> {
-                    val candidates = root.optJSONArray("candidates") ?: return ""
-                    val parts = candidates.optJSONObject(0)
+    private fun extractChunk(provider: Provider, data: String): String = try {
+        val root = JSONObject(data)
+        when (provider) {
+            Provider.GEMINI -> {
+                val candidates = root.optJSONArray("candidates") ?: return ""
+                val parts = candidates.optJSONObject(0)
+                    ?.optJSONObject("content")
+                    ?.optJSONArray("parts") ?: return ""
+                parts.optJSONObject(0)?.optString("text", "") ?: ""
+            }
+            Provider.OPENROUTER, Provider.CUSTOM -> {
+                val choices = root.optJSONArray("choices") ?: return ""
+                val delta = choices.optJSONObject(0)?.optJSONObject("delta") ?: return ""
+                delta.optString("content", delta.optString("reasoning_content", ""))
+            }
+        }
+    } catch (_: Exception) {
+        ""
+    }
+
+    suspend fun geminiGroundedAnswer(query: String, apiKey: String, model: String): String =
+        withContext(Dispatchers.IO) {
+            if (apiKey.isBlank()) return@withContext "Gemini API key missing."
+            val safeModel = model.ifBlank { "gemini-2.0-flash" }
+            val body = JSONObject()
+                .put("contents", JSONArray().put(
+                    JSONObject()
+                        .put("role", "user")
+                        .put("parts", JSONArray().put(JSONObject().put("text", query)))
+                ))
+                .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
+                .put("generationConfig", JSONObject().put("maxOutputTokens", 4096))
+                .toString()
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/$safeModel:generateContent?key=$apiKey"
+            val req = Request.Builder().url(url).post(body.toRequestBody(jsonMedia)).build()
+            try {
+                client.newCall(req).execute().use { response ->
+                    val raw = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) return@withContext "Gemini grounding failed: HTTP ${response.code} ${raw.take(200)}"
+                    val root = JSONObject(raw)
+                    val text = root.optJSONArray("candidates")
+                        ?.optJSONObject(0)
                         ?.optJSONObject("content")
-                        ?.optJSONArray("parts") ?: return ""
-                    parts.optJSONObject(0)?.optString("text", "") ?: ""
+                        ?.optJSONArray("parts")
+                        ?.optJSONObject(0)
+                        ?.optString("text", "")
+                        .orEmpty()
+                    val meta = root.optJSONArray("candidates")
+                        ?.optJSONObject(0)
+                        ?.optJSONObject("groundingMetadata")
+                    val sb = StringBuilder(text.ifBlank { "No grounded answer." })
+                    val chunks = meta?.optJSONArray("groundingChunks")
+                    if (chunks != null && chunks.length() > 0) {
+                        sb.append("\n\nGrounded sources:")
+                        for (i in 0 until chunks.length()) {
+                            val web = chunks.optJSONObject(i)?.optJSONObject("web") ?: continue
+                            sb.append("\n- ").append(web.optString("title"))
+                                .append(" — ").append(web.optString("uri"))
+                        }
+                    }
+                    sb.toString()
                 }
-                Provider.OPENROUTER, Provider.CUSTOM -> {
-                    val choices = root.optJSONArray("choices") ?: return ""
-                    val delta = choices.optJSONObject(0)?.optJSONObject("delta") ?: return ""
-                    delta.optString("content", delta.optString("reasoning_content", ""))
+            } catch (e: Exception) {
+                "Gemini grounding error: ${e.message}"
+            }
+        }
+
+    suspend fun webSearch(query: String, cfg: AiConfig? = null): String = withContext(Dispatchers.IO) {
+        if (cfg?.provider == Provider.GEMINI && cfg.apiKey.isNotBlank()) {
+            val grounded = geminiGroundedAnswer(query, cfg.apiKey, cfg.model)
+            if (!grounded.startsWith("Gemini ")) return@withContext grounded
+        }
+        val q = URLEncoder.encode(query.trim(), "UTF-8")
+        val sb = StringBuilder("Live web results for: ${query.trim()}\n\n")
+        val urls = LinkedHashSet<String>()
+
+        try {
+            val doc = Jsoup.connect("https://html.duckduckgo.com/html/?q=$q")
+                .userAgent("Mozilla/5.0 BypassStudio/2.0")
+                .timeout(15000).get()
+            doc.select(".result").take(5).forEach { result ->
+                val a = result.selectFirst(".result__a") ?: return@forEach
+                val title = a.text().trim()
+                val href = a.absUrl("href")
+                val snippet = result.selectFirst(".result__snippet")?.text().orEmpty().trim()
+                if (title.isNotBlank()) sb.append("- ").append(title).append(": ").append(snippet).append('\n')
+                if (href.startsWith("http")) urls.add(href)
+            }
+        } catch (e: Exception) {
+            sb.append("DuckDuckGo unavailable: ${e.message}\n")
+        }
+
+        try {
+            val doc = Jsoup.connect("https://www.bing.com/search?q=$q")
+                .userAgent("Mozilla/5.0 BypassStudio/2.0")
+                .timeout(15000).get()
+            doc.select("li.b_algo").take(5).forEach { result ->
+                val a = result.selectFirst("h2 a") ?: return@forEach
+                val title = a.text().trim()
+                val href = a.absUrl("href")
+                val snippet = result.selectFirst(".b_caption p")?.text().orEmpty().trim()
+                if (title.isNotBlank()) sb.append("- ").append(title).append(": ").append(snippet).append('\n')
+                if (href.startsWith("http")) urls.add(href)
+            }
+        } catch (e: Exception) {
+            sb.append("Bing unavailable: ${e.message}\n")
+        }
+
+        try {
+            val rss = Jsoup.connect("https://news.google.com/rss/search?q=$q&hl=en-US&gl=US&ceid=US:en")
+                .userAgent("Mozilla/5.0 BypassStudio/2.0")
+                .parser(Parser.xmlParser())
+                .timeout(15000).get()
+            val items = rss.select("item")
+            if (items.isNotEmpty()) {
+                sb.append("\nRecent news:\n")
+                items.take(4).forEach { item ->
+                    sb.append("- ").append(item.selectFirst("title")?.text().orEmpty())
+                        .append(" (").append(item.selectFirst("pubDate")?.text().orEmpty()).append(")\n")
                 }
             }
-        } catch (_: Exception) {
-            ""
+        } catch (e: Exception) {
+            sb.append("News RSS unavailable: ${e.message}\n")
+        }
+
+        urls.take(2).forEachIndexed { index, url ->
+            try {
+                val doc = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 BypassStudio/2.0")
+                    .timeout(15000).get()
+                val text = doc.select("article").text().ifBlank { doc.body().text() }
+                    .replace(Regex("\\s+"), " ").trim()
+                sb.append("\nSource ${index + 1} (${url.take(160)}):\n")
+                    .append(text.take(2200)).append('\n')
+            } catch (e: Exception) {
+                sb.append("\nSource fetch failed (${url.take(120)}): ${e.message}\n")
+            }
+        }
+        sb.toString()
+    }
+
+    suspend fun fetchUrl(url: String): String = withContext(Dispatchers.IO) {
+        try {
+            val doc = Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 BypassStudio/2.0")
+                .timeout(20000).get()
+            val title = doc.title().trim()
+            val text = doc.body().text().replace(Regex("\\s+"), " ").trim()
+            "Fetched: $title\n${text.take(6000)}"
+        } catch (e: Exception) {
+            "Fetch error: ${e.message}"
         }
     }
 
-    suspend fun webSearch(query: String): String = withContext(Dispatchers.IO) {
-        val q = URLEncoder.encode(query.trim(), "UTF-8")
-        val url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$q&format=json&srlimit=3"
-        val req = Request.Builder().url(url).header("User-Agent", "BypassStudio/1.0").build()
-        try {
-            client.newCall(req).execute().use { response ->
-                if (!response.isSuccessful) return@withContext "Search failed: HTTP ${response.code}"
-                val root = JSONObject(response.body?.string().orEmpty())
-                val results = root.optJSONObject("query")?.optJSONArray("search") ?: return@withContext "No results."
-                val sb = StringBuilder("Web grounding results:\n")
-                for (i in 0 until results.length()) {
-                    val item = results.getJSONObject(i)
-                    val snippet = item.optString("snippet", "").replace(Regex("<[^>]+>"), "")
-                    sb.append("- ").append(item.optString("title")).append(": ").append(snippet).append('\n')
+    suspend fun discoverModels(cfg: AiConfig): List<String> = withContext(Dispatchers.IO) {
+        when (cfg.provider) {
+            Provider.OPENROUTER -> {
+                if (cfg.apiKey.isBlank()) return@withContext listOf("google/gemini-2.0-flash-001", "deepseek/deepseek-chat-v3-0324:free")
+                val req = Request.Builder()
+                    .url("https://openrouter.ai/api/v1/models")
+                    .header("Authorization", "Bearer ${cfg.apiKey}")
+                    .build()
+                try {
+                    client.newCall(req).execute().use { response ->
+                        val raw = response.body?.string().orEmpty()
+                        if (!response.isSuccessful) return@withContext emptyList()
+                        val data = JSONObject(raw).optJSONArray("data") ?: return@withContext emptyList()
+                        val out = mutableListOf<String>()
+                        for (i in 0 until data.length()) {
+                            val id = data.optJSONObject(i)?.optString("id", "").orEmpty()
+                            if (id.endsWith(":free")) out.add(id)
+                        }
+                        out.sorted().take(40)
+                    }
+                } catch (_: Exception) {
+                    emptyList()
                 }
-                sb.toString()
             }
-        } catch (e: Exception) {
-            "Search error: ${e.message}"
+            Provider.GEMINI -> listOf("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash")
+            Provider.CUSTOM -> discoverOllamaModels(cfg.endpoint)
         }
     }
+
+    private fun discoverOllamaModels(endpoint: String): List<String> {
+        if (endpoint.isBlank()) return emptyList()
+        val base = when {
+            endpoint.contains("/v1/chat/completions") -> endpoint.substringBefore("/v1/chat/completions")
+            endpoint.contains("/api/chat") -> endpoint.substringBefore("/api/chat")
+            else -> endpoint.substringBeforeLast('/')
+        }
+        val urls = listOf("$base/api/tags", "$base/v1/models")
+        for (url in urls) {
+            try {
+                val req = Request.Builder().url(url).build()
+                client.newCall(req).execute().use { response ->
+                    val raw = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) return@use
+                    val root = JSONObject(raw)
+                    val arr = root.optJSONArray("models") ?: return@use
+                    val out = mutableListOf<String>()
+                    for (i in 0 until arr.length()) {
+                        val item = arr.optJSONObject(i) ?: continue
+                        val name = item.optString("name", item.optString("id", ""))
+                        if (name.isNotBlank()) out.add(name)
+                    }
+                    if (out.isNotEmpty()) throw FoundModels(out)
+                }
+            } catch (e: FoundModels) {
+                return e.models
+            } catch (_: Exception) {
+            }
+        }
+        return emptyList()
+    }
+
+    private class FoundModels(val models: List<String>) : Exception()
 }

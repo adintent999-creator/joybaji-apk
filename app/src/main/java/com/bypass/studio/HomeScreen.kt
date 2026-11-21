@@ -150,12 +150,12 @@ fun HomeScreen(vm: StudioViewModel, recognizer: SpeechRecognizer) {
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp), maxLines = 1)
             }
             DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                listOf(
+                (listOf(
                     "google/gemini-2.0-flash-001",
                     "google/gemini-2.5-flash",
                     "meta-llama/llama-3.3-70b-instruct:free",
                     "deepseek/deepseek-chat:free"
-                ).forEach { m ->
+                ) + vm.freeModels.take(20)).distinct().forEach { m ->
                     DropdownMenuItem(text = { Text(m, fontSize = 11.sp) }, onClick = { vm.model.value = m; modelMenu = false })
                 }
             }
@@ -170,6 +170,8 @@ fun HomeScreen(vm: StudioViewModel, recognizer: SpeechRecognizer) {
                     DropdownMenuItem(text = { Text(m) }, onClick = { vm.mode.value = m; modeMenu = false })
                 }
             }
+            Spacer(Modifier.width(6.dp))
+            GhostButton("Models") { vm.discoverFreeModels() }
             Spacer(Modifier.weight(1f))
             Text("${vm.budget.value / 1000}k", color = p.muted, fontSize = 10.sp)
         }

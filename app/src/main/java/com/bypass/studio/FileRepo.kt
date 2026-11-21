@@ -94,10 +94,12 @@ class FileRepo(private val context: Context) {
         dest
     }
 
-    inner class LocalServer(private val webRoot: File, private val port: Int = 8080) {
+    inner class LocalServer(private val webRoot: File, val port: Int = 8080) {
         private var socket: ServerSocket? = null
         @Volatile var running = false
             private set
+
+        fun isRunning(): Boolean = running
 
         fun start(onLog: (String) -> Unit) {
             if (running) return

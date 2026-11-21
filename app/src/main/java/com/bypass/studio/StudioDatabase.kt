@@ -10,56 +10,75 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "memory")
-data class MemoryEntity(@PrimaryKey val key: String, val value: String)
-
-@Entity(tableName = "chat")
-data class ChatEntity(
+@Entity(tableName = "chats")
+data class Chat(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val session: String,
+    val sessionId: String,
     val role: String,
     val content: String,
     val ts: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "memory")
+data class Memory(
+    @PrimaryKey val key: String,
+    val value: String,
+    val ts: Long = System.currentTimeMillis()
+)
+
 @Dao
 interface StudioDao {
-    @Query("SELECT value FROM memory WHERE key = :key")
-    suspend fun memory(key: String): String?
-
-    @Upsert
-    suspend fun putMemory(entity: MemoryEntity)
-
-    @Query("SELECT * FROM memory")
-    fun allMemory(): Flow<List<MemoryEntity>>
+    @Query("SELECT * FROM chats WHERE sessionId = :sid ORDER BY id ASC")
+    fun chat(sid: String): Flow<List<Chat>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertChat(entity: ChatEntity)
+    suspend fun insertChat(chat: Chat)
 
-    @Query("SELECT * FROM chat WHERE session = :session ORDER BY id ASC")
-    fun chat(session: String): Flow<List<ChatEntity>>
+    @Query("DELETE FROM chats WHERE sessionId = :sid")
+    suspend fun clearChat(sid: String)
 
-    @Query("DELETE FROM chat WHERE session = :session")
-    suspend fun clearChat(session: String)
-
-    @Query("SELECT DISTINCT session FROM chat ORDER BY id DESC")
+    @Query("SELECT DISTINCT sessionId FROM chats ORDER BY MAX(id) DESC")
     fun sessions(): Flow<List<String>>
+
+    @Query("SELECT * FROM memory ORDER BY ts DESC")
+    fun allMemory(): Flow<List<Memory>>
+
+    @Query("SELECT * FROM memory WHERE key LIKE '%' || :q || '%' OR value LIKE '%' || :q || '%' ORDER BY ts DESC")
+    suspend fun searchMemory(q: String): List<Memory>
+
+    @Query("DELETE FROM memory WHERE key = :key")
+    suspend fun deleteMemory(key: String)
+
+    @Query("DELETE FROM memory")
+    suspend fun clearMemory()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putMemory(mem: Memory)
 }
 
-@Database(entities = [MemoryEntity::class, ChatEntity::class], version = 1, exportSchema = false)
+@Database(entities = [Chat::class, Memory::class], version = 2, exportSchema = false)
 abstract class StudioDatabase : RoomDatabase() {
     abstract fun dao(): StudioDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: StudioDatabase? = null
+        @Volatile private var INSTANCE: StudioDatabase? = null
 
         fun get(context: Context): StudioDatabase = INSTANCE ?: synchronized(this) {
-            Room.databaseBuilder(context.applicationContext, StudioDatabase::class.java, "bypass_studio.db")
-                .build().also { INSTANCE = it }
+            INSTANCE ?: Room.databaseBuilder(
+                context.applicationContext,
+                StudioDatabase::class.java,
+                "bypass_studio.db"
+            ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+        }
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE memory ADD COLUMN ts INTEGER NOT NULL DEFAULT 0")
+            }
         }
     }
 }

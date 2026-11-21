@@ -28,12 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 fun SettingsScreen(vm: StudioViewModel) {
     val p = paletteFor(vm.theme.value)
+    val context = LocalContext.current
     var providerMenu by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().background(p.bg).padding(12.dp)) {
         LazyColumn(modifier = Modifier.weight(1f)) {
@@ -84,6 +86,50 @@ fun SettingsScreen(vm: StudioViewModel) {
                 Spacer(Modifier.height(14.dp))
             }
             item {
+                SectionTitle("Free model discovery")
+                Spacer(Modifier.height(6.dp))
+                GhostButton("Discover models") { vm.discoverFreeModels() }
+                Spacer(Modifier.height(6.dp))
+                Text("OpenRouter :free, Gemini Flash, and Ollama tags are read live.", color = p.muted, fontSize = 10.sp)
+                Spacer(Modifier.height(8.dp))
+            }
+            items(vm.freeModels.take(20)) { found ->
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = p.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, p.border),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                ) {
+                    Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(found, color = p.text, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                        GhostButton("Use") { vm.model.value = found }
+                    }
+                }
+            }
+            item {
+                SectionTitle("Quick AI presets")
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    listOf("Web app", "Fix bug", "Explain", "Broadcast").forEach { preset ->
+                        GhostButton(preset) { vm.applyPreset(preset) }
+                        Spacer(Modifier.width(4.dp))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            item {
+                SectionTitle("Workspace tools")
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    GhostButton("Memory") { vm.tab.value = 6 }
+                    Spacer(Modifier.width(4.dp))
+                    GhostButton("Broadcast") { vm.tab.value = 7 }
+                    Spacer(Modifier.width(4.dp))
+                    GhostButton("Servers") { vm.tab.value = 8 }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            item {
                 SectionTitle("Voice & memory")
                 Spacer(Modifier.height(8.dp))
                 Row {
@@ -108,8 +154,18 @@ fun SettingsScreen(vm: StudioViewModel) {
             item {
                 SectionTitle("Advanced")
                 ToggleRow("Auto-approve this session", vm.autoApprove.value) { vm.autoApprove.value = it }
-                ToggleRow("Dynamic Island capsule", vm.capsule.value) { vm.capsule.value = it }
-                ToggleRow("Background assistant", vm.backgroundAssistant.value) { vm.backgroundAssistant.value = it }
+                ToggleRow("Dynamic Island capsule", vm.capsule.value) { vm.setCapsule(context, it) }
+                ToggleRow("Background assistant", vm.backgroundAssistant.value) {
+                    vm.backgroundAssistant.value = it
+                    vm.syncBackground(context)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Overlay permission: ${if (vm.overlayGranted.value) "granted" else "not granted"}",
+                    color = if (vm.overlayGranted.value) p.green else p.muted,
+                    fontSize = 10.sp
+                )
+                GhostButton("Open overlay permission") { vm.requestOverlay(context) }
                 Spacer(Modifier.height(8.dp))
                 Surface(shape = RoundedCornerShape(12.dp), color = p.surface, border = androidx.compose.foundation.BorderStroke(1.dp, p.border)) {
                     Column(Modifier.padding(11.dp)) {

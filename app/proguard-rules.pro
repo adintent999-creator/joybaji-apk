@@ -1,46 +1,38 @@
 # Bypass Studio v2.0 release rules.
-# Keep runtime-reflective types used by Android, Compose, Room, OkHttp, Jsoup and WebView.
+# Keep only reflective/runtime boundaries; library AAR consumer rules cover the rest.
 
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, SourceFile, LineNumberTable
 -keepparameternames
 -renamesourcefileattribute SourceFile
+-dontwarn androidx.compose.**
+-dontwarn androidx.lifecycle.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.jsoup.**
+-dontwarn androidx.webkit.**
 
 # Android components (manifest-referenced)
 -keep public class com.bypass.studio.MainActivity { *; }
 -keep public class com.bypass.studio.VoiceService { *; }
 -keep public class com.bypass.studio.OverlayService { *; }
-
-# AndroidX / Compose
--keep class androidx.compose.** { *; }
--keep class androidx.lifecycle.** { *; }
 -keep class androidx.core.content.FileProvider { *; }
 
 # Room
 -keep class * extends androidx.room.RoomDatabase { *; }
 -keep @androidx.room.Entity class * { *; }
 -keep @androidx.room.Dao class * { *; }
--dontobfuscate class com.bypass.studio.StudioDatabase$*
+-keep class com.bypass.studio.StudioDatabase$* { *; }
 
-# Kotlin coroutines
+# Kotlin coroutines service loader factories
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
-
-# OkHttp
--keep class okhttp3.** { *; }
--dontwarn okhttp3.**
--dontwarn okio.**
-
-# Jsoup
--keep class org.jsoup.** { *; }
--dontwarn org.jsoup.**
 
 # WebView JavaScript bridge (if used by previews)
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
--keep class androidx.webkit.** { *; }
 
-# Serialization-like models and data classes kept by name for debugging/reporting
+# App models and singletons kept by name for debugging/reporting (small, app-only)
 -keep class com.bypass.studio.**$* { *; }
 -keepclassmembers class com.bypass.studio.** {
     public static final ** INSTANCE;

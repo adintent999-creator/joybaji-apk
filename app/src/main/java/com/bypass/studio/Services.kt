@@ -47,8 +47,24 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (Settings.canDrawOverlays(this)) showCapsule()
+        startForeground(1102, buildOverlayNotification())
+        if (Settings.canDrawOverlays(this)) showCapsule() else stopSelf()
         return START_STICKY
+    }
+
+    private fun buildOverlayNotification(): Notification {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "bypass_overlay", "Dynamic Island Capsule", NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Bypass Studio floating capsule" }
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+        return NotificationCompat.Builder(this, "bypass_overlay")
+            .setContentTitle("Bypass Studio")
+            .setContentText("Dynamic Island capsule active")
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setOngoing(true)
+            .build()
     }
 
     private fun showCapsule() {
@@ -57,7 +73,7 @@ class OverlayService : Service() {
         val view = View(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#00D9F5"))
+                setColor(Color.CYAN)
                 setStroke(2, Color.WHITE)
             }
             alpha = 0.88f
@@ -83,6 +99,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         capsule?.let { runCatching { windowManager?.removeView(it) } }
         capsule = null
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         super.onDestroy()
     }
 }
