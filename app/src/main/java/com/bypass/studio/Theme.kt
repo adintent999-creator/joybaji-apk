@@ -1,15 +1,12 @@
 package com.bypass.studio
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LocalDensity
 
 enum class StudioTheme(val label: String) {
     OBSIDIAN("Midnight Obsidian"),
@@ -46,12 +43,11 @@ fun paletteFor(theme: StudioTheme): Palette = when (theme) {
     )
 }
 
-val bengaliFont = FontFamily(Font(R.font.noto_sans_bengali))
-val monoFont = FontFamily(Font(R.font.jetbrains_mono))
-
 @Composable
 fun StudioTheme(theme: StudioTheme, content: @Composable () -> Unit) {
     val p = paletteFor(theme)
+    val currentDensity = LocalDensity.current
+    val scale = themeScale(theme)
     val scheme = darkColorScheme(
         primary = p.accent,
         onPrimary = Color.Black,
@@ -68,13 +64,12 @@ fun StudioTheme(theme: StudioTheme, content: @Composable () -> Unit) {
         outline = p.border,
         error = Color(0xFFFF6B6B)
     )
-    val type = Typography(
-        bodyLarge = TextStyle(fontFamily = bengaliFont, fontSize = 16.sp, lineHeight = 25.sp, letterSpacing = 0.sp),
-        bodyMedium = TextStyle(fontFamily = bengaliFont, fontSize = 14.sp, lineHeight = 22.sp, letterSpacing = 0.sp),
-        bodySmall = TextStyle(fontFamily = bengaliFont, fontSize = 12.sp, lineHeight = 19.sp, letterSpacing = 0.sp),
-        headlineSmall = TextStyle(fontFamily = bengaliFont, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 33.sp, letterSpacing = 0.sp),
-        titleMedium = TextStyle(fontFamily = bengaliFont, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.sp),
-        labelLarge = TextStyle(fontFamily = bengaliFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp, letterSpacing = 0.sp)
-    )
-    MaterialTheme(colorScheme = scheme, typography = type, content = content)
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = currentDensity.density * scale,
+            fontScale = currentDensity.fontScale * scale
+        )
+    ) {
+        MaterialTheme(colorScheme = scheme, typography = studioTypography(theme), content = content)
+    }
 }

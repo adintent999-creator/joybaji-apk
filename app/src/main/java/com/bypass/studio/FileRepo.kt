@@ -48,41 +48,50 @@ class FileRepo(private val context: Context) {
     }
 
     suspend fun cloneGitHub(url: String, onProgress: (String) -> Unit): File = withContext(Dispatchers.IO) {
-        val clean = url.trim().trimEnd('/')
-        val rest = clean.removePrefix("https://github.com/").removePrefix("http://github.com/").removePrefix("git@github.com:")
-        val parts = rest.split("/")
-        require(parts.size >= 2) { "Invalid GitHub URL. Use https://github.com/owner/repo" }
-        val owner = parts[0]
-        val repo = parts[1].removeSuffix(".git")
-        onProgress("Fetching $owner/$repo ...")
+        val parsed = GitHubZipResolver.parseRepo(url)
         val client = OkHttpClient()
-        val req = Request.Builder()
-            .url("https://api.github.com/repos/$owner/$repo/zipball")
-            .header("User-Agent", "BypassStudio/1.0")
+        onProgress("Detecting default branch for ${parsed.owner}/${parsed.repo} ...")
+        val metaRequest = Request.Builder()
+            .url(GitHubZipResolver.defaultBranchApiUrl(parsed))
+            .header("User-Agent", "BypassStudio/2.1")
+            .header("Accept", "application/vnd.github+json")
+            .build()
+        val branch = client.newCall(metaRequest).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("GitHub metadata HTTP ${response.code}")
+            val body = response.body?.string().orEmpty()
+            GitHubZipResolver.parseDefaultBranch(body)
+        }
+        val zipUrl = GitHubZipResolver.archiveUrl(parsed, branch)
+        onProgress("Downloading $zipUrl")
+        val zipRequest = Request.Builder()
+            .url(zipUrl)
+            .header("User-Agent", "BypassStudio/2.1")
             .build()
         val tmp = File(context.cacheDir, "clone-${System.currentTimeMillis()}.zip")
-        client.newCall(req).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("GitHub HTTP ${response.code}")
+        client.newCall(zipRequest).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("GitHub archive HTTP ${response.code}")
             response.body?.byteStream()?.use { input ->
                 tmp.outputStream().use { output -> input.copyTo(output) }
-            } ?: throw IOException("Empty response")
+            } ?: throw IOException("Empty archive response")
         }
-        val dest = File(root, "${repo}-${System.currentTimeMillis()}")
+        val dest = File(root, "${parsed.repo}-${System.currentTimeMillis()}")
         dest.mkdirs()
-        onProgress("Extracting ...")
-        ZipInputStream(FileInputStream(tmp)).use { zip ->
+        onProgress("Extracting archive (branch $branch) ...")
+        ZipInputStream(tmp.inputStream()).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                val raw = entry.name.replace('\\', '/')
-                val stripped = if (raw.contains('/')) raw.substringAfter('/') else ""
-                val safe = stripped.split('/').none { it == ".." }
-                if (safe && stripped.isNotEmpty()) {
+                val stripped = GitHubZipResolver.safeRelativeEntry(entry.name)
+                if (!stripped.isNullOrBlank()) {
                     val out = File(dest, stripped)
-                    if (entry.isDirectory) {
-                        out.mkdirs()
-                    } else {
-                        out.parentFile?.mkdirs()
-                        out.outputStream().use { zip.copyTo(it) }
+                    val canonical = out.canonicalPath
+                    val rootCanonical = dest.canonicalPath
+                    if (canonical.startsWith(rootCanonical)) {
+                        if (entry.isDirectory) {
+                            out.mkdirs()
+                        } else {
+                            out.parentFile?.mkdirs()
+                            out.outputStream().use { zip.copyTo(it) }
+                        }
                     }
                 }
                 zip.closeEntry()
@@ -90,7 +99,7 @@ class FileRepo(private val context: Context) {
             }
         }
         tmp.delete()
-        onProgress("Cloned to ${dest.name}")
+        onProgress("Cloned ${parsed.owner}/${parsed.repo} to ${dest.name}")
         dest
     }
 

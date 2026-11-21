@@ -79,9 +79,18 @@ object BroadcastExporter {
             onProgress(20)
 
             val parts = audioFiles.mapIndexed { i, file ->
-                val pcm = decodePcm(file)
-                onLog("Decoded line ${i + 1}: ${pcm.size / 2} frames")
-                pcm
+                if (!file.exists() || file.length() < 64) {
+                    onLog("TTS file missing or empty: ${file.name}")
+                    ShortArray(0)
+                } else {
+                    val pcm = decodePcm(file)
+                    onLog("Decoded line ${i + 1}: ${pcm.size / 2} frames")
+                    pcm
+                }
+            }
+            if (parts.any { it.isEmpty() }) {
+                onLog("One or more voice lines produced no decodable audio; export aborted")
+                return
             }
             onProgress(35)
 

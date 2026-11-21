@@ -31,12 +31,15 @@ jobs:
           echo "$RUNNER_TEMP/gradle-8.7/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/gradle-8.7/bin/gradle" --version
 
-      - name: Bundle fonts
+      - name: Verify bundled fonts
         run: |
-          mkdir -p app/src/main/res/font
-          curl -L --fail --retry 3 -o app/src/main/res/font/noto_sans_bengali.ttf "https://github.com/google/fonts/raw/main/ofl/notosansbengali/NotoSansBengali%5Bwdth%2Cwght%5D.ttf"
-          curl -L --fail --retry 3 -o app/src/main/res/font/jetbrains_mono.ttf "https://github.com/JetBrains/JetBrainsMono/raw/master/fonts/ttf/JetBrainsMono-Regular.ttf"
+          test -f app/src/main/res/font/noto_sans_bengali.ttf
+          test -f app/src/main/res/font/inter.ttf
+          test -f app/src/main/res/font/jetbrains_mono.ttf
           ls -lh app/src/main/res/font
+
+      - name: Run JVM unit tests
+        run: gradle testReleaseUnitTest --stacktrace --no-daemon
 
       - name: Build release APK
         run: gradle assembleRelease --stacktrace --no-daemon

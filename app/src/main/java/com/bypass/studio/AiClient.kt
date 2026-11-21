@@ -201,48 +201,39 @@ object AiClient {
         val urls = LinkedHashSet<String>()
 
         try {
-            val doc = Jsoup.connect("https://html.duckduckgo.com/html/?q=$q")
-                .userAgent("Mozilla/5.0 BypassStudio/2.0")
-                .timeout(15000).get()
-            doc.select(".result").take(5).forEach { result ->
-                val a = result.selectFirst(".result__a") ?: return@forEach
-                val title = a.text().trim()
-                val href = a.absUrl("href")
-                val snippet = result.selectFirst(".result__snippet")?.text().orEmpty().trim()
-                if (title.isNotBlank()) sb.append("- ").append(title).append(": ").append(snippet).append('\n')
-                if (href.startsWith("http")) urls.add(href)
+            val html = Jsoup.connect("https://html.duckduckgo.com/html/?q=$q")
+                .userAgent("Mozilla/5.0 BypassStudio/2.1")
+                .timeout(15000).get().html()
+            WebSearchParser.parseDuckDuckGo(html).forEach { result ->
+                sb.append("- ").append(result.title).append(": ").append(result.snippet).append('\n')
+                if (result.url.startsWith("http")) urls.add(result.url)
             }
         } catch (e: Exception) {
             sb.append("DuckDuckGo unavailable: ${e.message}\n")
         }
 
         try {
-            val doc = Jsoup.connect("https://www.bing.com/search?q=$q")
-                .userAgent("Mozilla/5.0 BypassStudio/2.0")
-                .timeout(15000).get()
-            doc.select("li.b_algo").take(5).forEach { result ->
-                val a = result.selectFirst("h2 a") ?: return@forEach
-                val title = a.text().trim()
-                val href = a.absUrl("href")
-                val snippet = result.selectFirst(".b_caption p")?.text().orEmpty().trim()
-                if (title.isNotBlank()) sb.append("- ").append(title).append(": ").append(snippet).append('\n')
-                if (href.startsWith("http")) urls.add(href)
+            val html = Jsoup.connect("https://www.bing.com/search?q=$q")
+                .userAgent("Mozilla/5.0 BypassStudio/2.1")
+                .timeout(15000).get().html()
+            WebSearchParser.parseBing(html).forEach { result ->
+                sb.append("- ").append(result.title).append(": ").append(result.snippet).append('\n')
+                if (result.url.startsWith("http")) urls.add(result.url)
             }
         } catch (e: Exception) {
             sb.append("Bing unavailable: ${e.message}\n")
         }
 
         try {
-            val rss = Jsoup.connect("https://news.google.com/rss/search?q=$q&hl=en-US&gl=US&ceid=US:en")
-                .userAgent("Mozilla/5.0 BypassStudio/2.0")
+            val xml = Jsoup.connect("https://news.google.com/rss/search?q=$q&hl=en-US&gl=US&ceid=US:en")
+                .userAgent("Mozilla/5.0 BypassStudio/2.1")
                 .parser(Parser.xmlParser())
-                .timeout(15000).get()
-            val items = rss.select("item")
+                .timeout(15000).get().html()
+            val items = WebSearchParser.parseNewsRss(xml)
             if (items.isNotEmpty()) {
                 sb.append("\nRecent news:\n")
-                items.take(4).forEach { item ->
-                    sb.append("- ").append(item.selectFirst("title")?.text().orEmpty())
-                        .append(" (").append(item.selectFirst("pubDate")?.text().orEmpty()).append(")\n")
+                items.forEach { (title, date) ->
+                    sb.append("- ").append(title).append(" (").append(date).append(")\n")
                 }
             }
         } catch (e: Exception) {

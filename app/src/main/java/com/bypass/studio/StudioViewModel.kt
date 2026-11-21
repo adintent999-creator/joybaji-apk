@@ -22,9 +22,6 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ChatMessage(val role: String, val content: String)
 
@@ -114,9 +111,6 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     val availablePersonas: List<String> get() = voice.personaNames
 
-    private val toolRegex = Regex("""<(file|edit_file|mkdir|delete_file|command|fetch)([^>]*)>([\s\S]*?)</\1>""")
-    private val memoryRegex = Regex("""<memory_save>([\s\S]*?)</memory_save>""")
-
     init {
         voice.init()
         overlayGranted.value = Settings.canDrawOverlays(app)
@@ -201,8 +195,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun memorySnapshot(): String {
         val rows = dao.allMemory().first().takeLast(40)
-        if (rows.isEmpty()) return "No persistent memory yet."
-        return "Persistent memory:\n" + rows.joinToString("\n") { "- ${it.key}: ${it.value}" }
+        return MemoryPromptBuilder.build(rows.map { it.key to it.value })
     }
 
     fun refreshProjects() {
@@ -519,21 +512,14 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun saveMemories(full: String) {
-        memoryRegex.findAll(full).forEach { match ->
-            val fact = match.groupValues[1].trim()
-            if (fact.isNotBlank()) {
-                val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-                putMemory("auto_${System.currentTimeMillis()}", "$stamp | $fact")
-            }
+        val now = System.currentTimeMillis()
+        MemoryPromptBuilder.extractFacts(full, now).forEach { fact ->
+            putMemory(fact.key, fact.value)
         }
         refreshMemory(memoryQuery.value)
     }
 
-    private fun cleanOutput(full: String): String {
-        var out = toolRegex.replace(full, "")
-        out = memoryRegex.replace(out, "")
-        return out.trim().ifBlank { "Done." }
-    }
+    private fun cleanOutput(full: String): String = ToolParser.clean(full)
 
     private suspend fun appendAssistant(text: String) {
         messages.add(ChatMessage("assistant", text))
@@ -541,12 +527,11 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun parseActions(text: String): List<PendingAction> {
-        return toolRegex.findAll(text).map { match ->
-            val type = match.groupValues[1]
-            val attrs = match.groupValues[2]
-            val body = match.groupValues[3].trim()
-            val pathAttr = Regex("""path="([^"]+)"""").find(attrs)?.groupValues?.get(1) ?: ""
-            val id = "a${System.nanoTime()}"
+        return ToolParser.parse(text).map { call ->
+            val type = call.type
+            val body = call.body
+            val pathAttr = call.path
+            val id = "a${System.nanoTime()}-${type}"
             when (type) {
                 "command" -> PendingAction(id, type, "Run shell command", body, "", "", body)
                 "fetch" -> PendingAction(id, type, "Live web search", body, "", "", body)
@@ -564,12 +549,24 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             }
-        }.toList()
+        }
     }
 
-    private fun setActionStatus(action: PendingAction, status: String) {
-        val index = pendingActions.indexOfFirst { it.id == action.id }
-        if (index >= 0) pendingActions[index] = action.copy(status = status)
+    private fun setActionStatus(action: PendingAction, status: String) =
+        setActionStatusById(action.id, status)
+
+    private fun setActionStatusById(id: String, status: String) {
+        val index = pendingActions.indexOfFirst { it.id == id }
+        if (index >= 0) pendingActions[index] = pendingActions[index].copy(status = status)
+    }
+
+    private fun applyQueueDecision(decision: ApprovalQueue.Decision): List<PendingAction> {
+        val commands = pendingActions.map {
+            ApprovalQueue.Command(it.id, it.type, it.path, it.status)
+        }
+        val next = ApprovalQueue.decide(commands, decision)
+        next.forEach { setActionStatusById(it.id, it.status) }
+        return pendingActions.filter { it.id in next.map { c -> c.id } }
     }
 
     fun rejectAction(id: String) {
@@ -584,16 +581,16 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun approveAll() {
-        val list = pendingActions.filter { it.status == "PENDING" }
+        val list = applyQueueDecision(ApprovalQueue.Decision.APPROVE).filter { it.status == "QUEUED" }
         if (list.isEmpty()) return
-        list.forEach { setActionStatus(it, "QUEUED") }
+        actionStatus.add("Queue: ${ApprovalQueue.summary(pendingActions.map { ApprovalQueue.Command(it.id, it.type, it.path, it.status) })}")
         viewModelScope.launch {
             list.forEach { executeAction(it) }
         }
     }
 
     fun keepAll() {
-        val list = pendingActions.filter { it.status == "PENDING" }
+        val list = applyQueueDecision(ApprovalQueue.Decision.KEEP).filter { it.status == "KEPT" }
         if (list.isEmpty()) return
         viewModelScope.launch {
             list.forEach { action ->
@@ -610,6 +607,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun rejectAll() {
+        val commands = pendingActions.map { ApprovalQueue.Command(it.id, it.type, it.path, it.status) }
+        log("Queue: ${ApprovalQueue.summary(ApprovalQueue.decide(commands, ApprovalQueue.Decision.REJECT))}")
         pendingActions.clear()
         actionStatus.clear()
         log("All actions rejected")
@@ -624,6 +623,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     fun denyAction() = rejectAll()
 
     private suspend fun executeAction(action: PendingAction) {
+        val command = ApprovalQueue.Command(action.id, action.type, action.path, action.status)
+        if (!ApprovalQueue.canExecute(command)) return
         setActionStatus(action, "RUNNING")
         try {
             actionStatus.add("Analyzing ${action.path.ifBlank { action.type }}")

@@ -17,8 +17,8 @@ android {
         applicationId = "com.bypass.studio"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -48,6 +48,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     buildTypes {
@@ -93,5 +97,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.jsoup)
     implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

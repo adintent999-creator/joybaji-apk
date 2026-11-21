@@ -7,11 +7,15 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class VoiceEngine(private val context: Context, private val onLog: (String) -> Unit) {
     private var tts: TextToSpeech? = null
+    private val ttsLock = Any()
     var ready = false
         private set
 
@@ -82,14 +86,39 @@ class VoiceEngine(private val context: Context, private val onLog: (String) -> U
             return
         }
         file.parentFile?.mkdirs()
-        applyVoice(lang, persona, speed)
-        val result = tts?.synthesizeToFile(
-            text,
-            null,
-            file,
-            "bypass-export-${System.currentTimeMillis()}"
-        ) ?: TextToSpeech.ERROR
-        onDone(result)
+        val utteranceId = "bypass-export-${System.nanoTime()}"
+        val latch = CountDownLatch(1)
+        val result = intArrayOf(TextToSpeech.SUCCESS)
+        synchronized(ttsLock) {
+            applyVoice(lang, persona, speed)
+            tts?.setUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(id: String?) {
+                    if (id == utteranceId) {
+                        result[0] = TextToSpeech.SUCCESS
+                        latch.countDown()
+                    }
+                }
+                override fun onError(id: String?) {
+                    if (id == utteranceId) {
+                        result[0] = TextToSpeech.ERROR
+                        latch.countDown()
+                    }
+                }
+            })
+            val started = tts?.synthesizeToFile(text, null, file, utteranceId)
+                ?: TextToSpeech.ERROR
+            if (started != TextToSpeech.SUCCESS) {
+                result[0] = started
+                onDone(started)
+                return
+            }
+            if (!latch.await(90, TimeUnit.SECONDS)) {
+                result[0] = TextToSpeech.ERROR
+                onLog("TTS timeout: ${file.name}")
+            }
+        }
+        onDone(result[0])
     }
 
     fun startListening(
