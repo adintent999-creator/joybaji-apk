@@ -41,7 +41,7 @@ interface StudioDao {
     @Query("DELETE FROM chats WHERE sessionId = :sid")
     suspend fun clearChat(sid: String)
 
-    @Query("SELECT DISTINCT sessionId FROM chats ORDER BY MAX(id) DESC")
+    @Query("SELECT sessionId FROM chats GROUP BY sessionId ORDER BY MAX(id) DESC")
     fun sessions(): Flow<List<String>>
 
     @Query("SELECT * FROM memory ORDER BY ts DESC")
