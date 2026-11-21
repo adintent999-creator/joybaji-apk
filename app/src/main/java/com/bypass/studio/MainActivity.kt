@@ -1,0 +1,118 @@
+package com.bypass.studio
+
+import android.Manifest
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.speech.SpeechRecognizer
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.Default.Chat
+import androidx.compose.material.icons.Default.Code
+import androidx.compose.material.icons.Default.Folder
+import androidx.compose.material.icons.Default.Public
+import androidx.compose.material.icons.Default.Terminal
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
+
+class MainActivity : ComponentActivity() {
+    private lateinit var vm: StudioViewModel
+    private lateinit var recognizer: SpeechRecognizer
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        vm = ViewModelProvider(this)[StudioViewModel::class.java]
+        recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+
+        val permissions = mutableListOf<String>(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            permissions.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
+        }
+        ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 77)
+
+        setContent {
+            StudioTheme(vm.theme.value) {
+                LaunchedEffect(vm.capsule.value) {
+                    if (vm.capsule.value) this@MainActivity.startService(Intent(this@MainActivity, OverlayService::class.java))
+                    else this@MainActivity.stopService(Intent(this@MainActivity, OverlayService::class.java))
+                }
+                LaunchedEffect(vm.backgroundAssistant.value) {
+                    val intent = Intent(this@MainActivity, VoiceService::class.java)
+                    if (vm.backgroundAssistant.value) ContextCompat.startForegroundService(this@MainActivity, intent)
+                    else this@MainActivity.stopService(intent)
+                }
+                Scaffold(
+                    topBar = { TopHeader(vm) },
+                    bottomBar = { BottomNav(vm) },
+                    containerColor = paletteFor(vm.theme.value).bg
+                ) { padding ->
+                    Box(Modifier.padding(padding).fillMaxSize()) {
+                        when (vm.tab.value) {
+                            0 -> HomeScreen(vm, recognizer)
+                            1 -> FilesScreen(vm)
+                            2 -> EditorScreen(vm)
+                            3 -> TerminalScreen(vm)
+                            4 -> PreviewScreen(vm)
+                            5 -> SettingsScreen(vm)
+                            else -> HomeScreen(vm, recognizer)
+                        }
+                        ApprovalOverlay(vm)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        runCatching { recognizer.destroy() }
+        vm.voice.shutdown()
+        vm.stopServer()
+        super.onDestroy()
+    }
+}
+
+@Composable
+private fun BottomNav(vm: StudioViewModel) {
+    val p = paletteFor(vm.theme.value)
+    val items = listOf(
+        NavItem("Home", Icons.Default.Chat),
+        NavItem("Files", Icons.Default.Folder),
+        NavItem("Editor", Icons.Default.Code),
+        NavItem("Terminal", Icons.Default.Terminal),
+        NavItem("Preview", Icons.Default.Public)
+    )
+    NavigationBar(containerColor = p.surface) {
+        items.forEachIndexed { index, item ->
+            NavigationBarItem(
+                selected = vm.tab.value == index,
+                onClick = { vm.tab.value = index },
+                icon = { androidx.compose.material3.Icon(item.icon, contentDescription = item.label) },
+                label = { Text(item.label, fontSize = 10.sp) },
+                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                    selectedIconColor = p.accent,
+                    selectedTextColor = p.accent,
+                    indicatorColor = p.surface2,
+                    unselectedIconColor = p.muted,
+                    unselectedTextColor = p.muted
+                )
+            )
+        }
+    }
+}
+
+private data class NavItem(val label: String, val icon: ImageVector)
