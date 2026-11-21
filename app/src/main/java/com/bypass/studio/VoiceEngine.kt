@@ -91,7 +91,7 @@ class VoiceEngine(private val context: Context, private val onLog: (String) -> U
         val result = intArrayOf(TextToSpeech.SUCCESS)
         synchronized(ttsLock) {
             applyVoice(lang, persona, speed)
-            tts?.setUtteranceProgressListener(object : UtteranceProgressListener() {
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(id: String?) {
                     if (id == utteranceId) {
