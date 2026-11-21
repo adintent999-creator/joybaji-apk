@@ -119,24 +119,26 @@ object AiClient {
         else -> "none"
     }
 
-    private fun extractChunk(provider: Provider, data: String): String = try {
-        val root = JSONObject(data)
-        when (provider) {
-            Provider.GEMINI -> {
-                val candidates = root.optJSONArray("candidates") ?: return ""
-                val parts = candidates.optJSONObject(0)
-                    ?.optJSONObject("content")
-                    ?.optJSONArray("parts") ?: return ""
-                parts.optJSONObject(0)?.optString("text", "") ?: ""
+    private fun extractChunk(provider: Provider, data: String): String {
+        return try {
+            val root = JSONObject(data)
+            when (provider) {
+                Provider.GEMINI -> {
+                    val candidates = root.optJSONArray("candidates") ?: return ""
+                    val parts = candidates.optJSONObject(0)
+                        ?.optJSONObject("content")
+                        ?.optJSONArray("parts") ?: return ""
+                    parts.optJSONObject(0)?.optString("text", "") ?: ""
+                }
+                Provider.OPENROUTER, Provider.CUSTOM -> {
+                    val choices = root.optJSONArray("choices") ?: return ""
+                    val delta = choices.optJSONObject(0)?.optJSONObject("delta") ?: return ""
+                    delta.optString("content", delta.optString("reasoning_content", ""))
+                }
             }
-            Provider.OPENROUTER, Provider.CUSTOM -> {
-                val choices = root.optJSONArray("choices") ?: return ""
-                val delta = choices.optJSONObject(0)?.optJSONObject("delta") ?: return ""
-                delta.optString("content", delta.optString("reasoning_content", ""))
-            }
+        } catch (_: Exception) {
+            ""
         }
-    } catch (_: Exception) {
-        ""
     }
 
     suspend fun webSearch(query: String): String = withContext(Dispatchers.IO) {

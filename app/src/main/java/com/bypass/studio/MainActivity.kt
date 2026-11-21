@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Default.Chat
-import androidx.compose.material.icons.Default.Code
-import androidx.compose.material.icons.Default.Folder
-import androidx.compose.material.icons.Default.Public
-import androidx.compose.material.icons.Default.Terminal
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -25,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
@@ -90,11 +86,11 @@ class MainActivity : ComponentActivity() {
 private fun BottomNav(vm: StudioViewModel) {
     val p = paletteFor(vm.theme.value)
     val items = listOf(
-        NavItem("Home", Icons.Default.Chat),
-        NavItem("Files", Icons.Default.Folder),
-        NavItem("Editor", Icons.Default.Code),
-        NavItem("Terminal", Icons.Default.Terminal),
-        NavItem("Preview", Icons.Default.Public)
+        NavItem("Home", Icons.Filled.Chat),
+        NavItem("Files", Icons.Filled.Folder),
+        NavItem("Editor", Icons.Filled.Code),
+        NavItem("Terminal", Icons.Filled.Terminal),
+        NavItem("Preview", Icons.Filled.Public)
     )
     NavigationBar(containerColor = p.surface) {
         items.forEachIndexed { index, item ->

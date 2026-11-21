@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -59,9 +60,9 @@ fun ApprovalOverlay(vm: StudioViewModel) {
                 }
                 Spacer(Modifier.height(10.dp))
                 Row {
-                    GhostButton("Deny", vm::denyAction)
+                    GhostButton("Deny", onClick = vm::denyAction)
                     Spacer(Modifier.width(8.dp))
-                    AccentButton("Approve & run", vm::approveAction, modifier = Modifier.weight(1f))
+                    AccentButton("Approve & run", modifier = Modifier.weight(1f), onClick = vm::approveAction)
                 }
             }
         }

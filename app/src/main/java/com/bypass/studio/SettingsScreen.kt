@@ -1,6 +1,7 @@
 package com.bypass.studio
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +22,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +53,7 @@ fun SettingsScreen(vm: StudioViewModel) {
                 Spacer(Modifier.height(6.dp))
                 Surface(shape = RoundedCornerShape(10.dp), color = p.surface2,
                     border = androidx.compose.foundation.BorderStroke(1.dp, p.border),
-                    modifier = Modifier.fillMaxWidth().androidx.compose.foundation.clickable { providerMenu = true }) {
+                    modifier = Modifier.fillMaxWidth().clickable { providerMenu = true }) {
                     Text(vm.provider.value.label, color = p.text, fontSize = 13.sp, modifier = Modifier.padding(11.dp))
                 }
                 DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {

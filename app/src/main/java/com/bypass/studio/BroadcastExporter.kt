@@ -25,7 +25,7 @@ object BroadcastExporter {
         }
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        val surface: Surface = codec.inputSurface
+        val surface: Surface = codec.createInputSurface()
         val muxer = MediaMuxer(out.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         val info = MediaCodec.BufferInfo()
         try {

@@ -21,14 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Default.Add
-import androidx.compose.material.icons.Default.ContentCopy
-import androidx.compose.material.icons.Default.Delete
-import androidx.compose.material.icons.Default.KeyboardArrowDown
-import androidx.compose.material.icons.Default.Mic
-import androidx.compose.material.icons.Default.Send
-import androidx.compose.material.icons.Default.Stop
-import androidx.compose.material.icons.Default.VolumeUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -38,7 +30,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +68,7 @@ fun HomeScreen(vm: StudioViewModel, recognizer: SpeechRecognizer) {
             ) {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(vm.session.value, color = p.text, fontSize = 11.sp, maxLines = 1)
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = p.muted, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = p.muted, modifier = Modifier.size(16.dp))
                 }
             }
             DropdownMenu(expanded = sessionMenu, onDismissRequest = { sessionMenu = false }) {
@@ -85,11 +79,11 @@ fun HomeScreen(vm: StudioViewModel, recognizer: SpeechRecognizer) {
             Spacer(Modifier.width(6.dp))
             StatusPill("READY", p.green)
             Spacer(Modifier.weight(1f))
-            ToolIcon(Icons.Default.Add, "New session", { vm.newSession() }, p.accent)
-            ToolIcon(Icons.Default.ContentCopy, "Copy chat", {
+            ToolIcon(Icons.Filled.Add, "New session", { vm.newSession() }, p.accent)
+            ToolIcon(Icons.Filled.ContentCopy, "Copy chat", {
                 copyText(context, vm.messages.joinToString("\n") { "${it.role}: ${it.content}" })
             }, p.muted)
-            ToolIcon(Icons.Default.Delete, "Clear chat", { vm.clearChat() }, p.muted)
+            ToolIcon(Icons.Filled.Delete, "Clear chat", { vm.clearChat() }, p.muted)
         }
 
         LazyColumn(
@@ -123,14 +117,14 @@ fun HomeScreen(vm: StudioViewModel, recognizer: SpeechRecognizer) {
             )
             Spacer(Modifier.width(6.dp))
             IconButton(onClick = { vm.startVoiceInput(recognizer) }, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Mic, contentDescription = "Mic", tint = p.accent, modifier = Modifier.size(24.dp))
+                Icon(Icons.Filled.Mic, contentDescription = "Mic", tint = p.accent, modifier = Modifier.size(24.dp))
             }
             IconButton(
                 onClick = { if (vm.streaming.value) vm.streamBuffer.value = "" else vm.sendPrompt() },
                 modifier = Modifier.size(48.dp).background(p.accent, RoundedCornerShape(14.dp))
             ) {
                 Icon(
-                    if (vm.streaming.value) Icons.Default.Stop else Icons.Default.Send,
+                    if (vm.streaming.value) Icons.Filled.Stop else Icons.Filled.Send,
                     contentDescription = "Send",
                     tint = androidx.compose.ui.graphics.Color.Black,
                     modifier = Modifier.size(22.dp)
@@ -200,7 +194,7 @@ private fun MessageBubble(msg: ChatMessage, vm: StudioViewModel, p: Palette) {
                         Column(Modifier.padding(9.dp)) {
                             Text(part.trim(), fontFamily = monoFont, color = p.text, fontSize = 11.sp, lineHeight = 18.sp)
                             Row {
-                                ToolIcon(Icons.Default.ContentCopy, "Copy code", { copyText(context, part.trim()) }, p.muted)
+                                ToolIcon(Icons.Filled.ContentCopy, "Copy code", { copyText(context, part.trim()) }, p.muted)
                                 Text("Insert to Editor", color = p.accent, fontSize = 10.sp,
                                     modifier = Modifier.clickable {
                                         val target = vm.currentFile.value ?: File(vm.project.value, "ai_insert.txt")
@@ -222,8 +216,8 @@ private fun MessageBubble(msg: ChatMessage, vm: StudioViewModel, p: Palette) {
                 }
             }
             Row {
-                ToolIcon(Icons.Default.ContentCopy, "Copy", { copyText(context, msg.content) }, p.muted)
-                if (!isUser) ToolIcon(Icons.Default.VolumeUp, "Speak", { vm.speak(msg.content) }, p.muted)
+                ToolIcon(Icons.Filled.ContentCopy, "Copy", { copyText(context, msg.content) }, p.muted)
+                if (!isUser) ToolIcon(Icons.Filled.VolumeUp, "Speak", { vm.speak(msg.content) }, p.muted)
             }
         }
     }

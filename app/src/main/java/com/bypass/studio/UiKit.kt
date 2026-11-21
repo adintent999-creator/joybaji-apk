@@ -46,7 +46,7 @@ fun StatusPill(text: String, color: Color) {
 }
 
 @Composable
-fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun AccentButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -62,7 +62,7 @@ fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
 }
 
 @Composable
-fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun GhostButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -119,14 +119,14 @@ fun TopHeader(vm: StudioViewModel) {
         StatusPill(":8080", if (vm.serverRunning.value) p.green else p.muted)
         IconButton(onClick = { vm.tab.value = 4 }) {
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Default.PlayArrow,
+                androidx.compose.material.icons.Icons.Filled.PlayArrow,
                 contentDescription = "Preview",
                 tint = p.accent
             )
         }
         IconButton(onClick = { vm.tab.value = 5 }) {
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Default.Settings,
+                androidx.compose.material.icons.Icons.Filled.Settings,
                 contentDescription = "Settings",
                 tint = p.muted
             )

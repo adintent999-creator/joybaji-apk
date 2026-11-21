@@ -16,7 +16,7 @@ import kotlin.concurrent.thread
 class FileRepo(private val context: Context) {
     val root = File(context.filesDir, "projects").apply { mkdirs() }
 
-    fun projects(): List<File> = root.listFiles { it.isDirectory }?.toList().orEmpty()
+    fun projects(): List<File> = root.listFiles { file -> file.isDirectory }?.toList().orEmpty()
 
     fun list(dir: File): List<File> =
         if (dir.exists() && dir.isDirectory) dir.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name })).orEmpty()

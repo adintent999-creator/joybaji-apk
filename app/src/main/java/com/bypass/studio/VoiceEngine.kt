@@ -16,11 +16,11 @@ class VoiceEngine(private val context: Context, private val onLog: (String) -> U
         private set
 
     private val personas = mapOf(
-        "Emma" to 1.15f to 1.00f,
-        "Swara" to 1.10f to 1.05f,
-        "Anaya" to 1.20f to 1.10f,
-        "Aarav" to 0.88f to 0.96f,
-        "Rohan" to 0.92f to 1.00f
+        "Emma" to (1.15f to 1.00f),
+        "Swara" to (1.10f to 1.05f),
+        "Anaya" to (1.20f to 1.10f),
+        "Aarav" to (0.88f to 0.96f),
+        "Rohan" to (0.92f to 1.00f)
     )
 
     fun init() {

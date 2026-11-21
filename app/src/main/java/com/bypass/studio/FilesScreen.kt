@@ -15,9 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Default.ContentCopy
-import androidx.compose.material.icons.Default.Delete
-import androidx.compose.material.icons.Default.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,7 +23,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +49,7 @@ fun FilesScreen(vm: StudioViewModel) {
                 modifier = Modifier.clickable { projectMenu = true }) {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(vm.project.value.name, color = p.text, fontSize = 12.sp, maxLines = 1)
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = p.muted)
+                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = p.muted)
                 }
             }
             DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
@@ -73,7 +72,7 @@ fun FilesScreen(vm: StudioViewModel) {
                 shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.width(6.dp))
-            AccentButton("Clone", { if (cloneUrl.isNotBlank()) { vm.cloneRepo(cloneUrl.trim()); cloneUrl = "" } })
+            AccentButton("Clone", onClick = { if (cloneUrl.isNotBlank()) { vm.cloneRepo(cloneUrl.trim()); cloneUrl = "" } })
         }
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -105,10 +104,10 @@ fun FilesScreen(vm: StudioViewModel) {
                         Spacer(Modifier.width(8.dp))
                         Text(file.name, color = p.text, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
                         androidx.compose.material3.IconButton(onClick = { copyText(context, file.absolutePath) }) {
-                            Icon(Icons.Default.ContentCopy, null, tint = p.muted)
+                            Icon(Icons.Filled.ContentCopy, null, tint = p.muted)
                         }
                         androidx.compose.material3.IconButton(onClick = { vm.deleteFile(file) }) {
-                            Icon(Icons.Default.Delete, null, tint = p.muted)
+                            Icon(Icons.Filled.Delete, null, tint = p.muted)
                         }
                     }
                 }
